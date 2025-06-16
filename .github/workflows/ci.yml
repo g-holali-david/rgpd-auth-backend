@@ -3,34 +3,44 @@ name: Backend CI/CD
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Checkout code
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: ☕ Setup Java 17
+      - name: Setup Java 17
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 17
 
-      - name: 🧪 Build & SonarCloud Scan via Maven
-        run: mvn clean package -DskipTests sonar:sonar -Dsonar.token=${{ secrets.SONAR_TOKEN }}
+      - name: Build with Maven and run tests
+        run: mvn clean verify
 
-      - name: 📂 Vérification du JAR
+      - name: SonarCloud Scan
+        run: mvn sonar:sonar -Dsonar.token=${{ secrets.SONAR_TOKEN }}
+
+      - name: Vérification du JAR
         run: ls -l target/
 
-      - name: 🐳 Docker Login
+      - name: Semgrep Security Scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: "p/default"
+
+      - name: Docker Login
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: 🚀 Docker Build & Push
+      - name: Docker Build & Push
         run: |
           docker build \
             --build-arg DB_HOST=${{ secrets.DB_HOST }} \
