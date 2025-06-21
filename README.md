@@ -1,4 +1,4 @@
-﻿# TP RGPD – Partie 2.3 : Backend pour une logique de frontend de gestion de token
+# TP RGPD – Partie 2.3 : Backend pour une logique de frontend de gestion de token
 
 ## Choix de la partie
 J’ai choisi de réaliser la **partie 2.3 du TP** :  
@@ -8,11 +8,17 @@ J’ai choisi de réaliser la **partie 2.3 du TP** :
 
 ## Présentation du projet
 
-**Nom du projet** : `secureprofile-backend`  
-**Auteur** : GAVI Holali David  
+**Nom du projet** : `rgpd-auth-backend`  
+**Auteur** : GAVI Holali David 
 **Technos** : Spring Boot, Spring Security, JWT, PostgreSQL, Docker, GitHub Actions
 
 Ce backend assure une **gestion sécurisée de l’authentification**, la gestion de rôles et de sessions avec des **tokens JWT signés**, dans le respect des bonnes pratiques RGPD.
+
+---
+
+## Dépôt GitHub
+
+👉 [Lien vers le dépôt GitHub du projet](https://github.com/g-holali-david/rgpd-auth-backend.git)
 
 ---
 
@@ -91,12 +97,6 @@ Le projet est conteneurisé (`Dockerfile`) et les variables sensibles sont charg
 
 ---
 
-
-## Dépôt GitHub
-
-👉 [Lien vers le dépôt GitHub du projet](https://github.com/ton-utilisateur/secureprofile-backend)
-
----
 
 ## Conclusion
 
