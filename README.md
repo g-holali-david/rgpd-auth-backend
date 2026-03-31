@@ -1,112 +1,182 @@
-# TP RGPD – Partie 2.3 : Backend pour une logique de frontend de gestion de token
+# RGPD Auth Backend
 
-## Choix de la partie
-J’ai choisi de réaliser la **partie 2.3 du TP** :  
-> **Créer une logique de backend pour une logique de frontend de gestion de token**, en respectant les bonnes pratiques de développement logiciel et de sécurité (RGPD-compliance, JWT, SOLID…).
+> GDPR-compliant authentication REST API built with Spring Boot, featuring encrypted PII storage, JWT access/refresh tokens, brute-force protection, and a full CI/CD pipeline with SonarCloud and Docker.
 
----
+![Java](https://img.shields.io/badge/Java_17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot_3.1-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![SonarCloud](https://img.shields.io/badge/SonarCloud-F3702A?style=for-the-badge&logo=sonarcloud&logoColor=white)
 
-## Présentation du projet
+## Architecture
 
-**Nom du projet** : `rgpd-auth-backend`  
-**Auteur** : GAVI Holali David 
-**Technos** : Spring Boot, Spring Security, JWT, PostgreSQL, Docker, GitHub Actions
+```mermaid
+flowchart TD
+    Client[Client Application] -->|REST API| Auth
 
-Ce backend assure une **gestion sécurisée de l’authentification**, la gestion de rôles et de sessions avec des **tokens JWT signés**, dans le respect des bonnes pratiques RGPD.
+    subgraph Backend["Spring Boot Application"]
+        Auth[AuthController<br/>/api/v1/auth/**]
+        User[UserController]
+        Admin[AdminController<br/>/api/v1/admin/**]
+        
+        Auth --> JWT[JwtService<br/>Access + Refresh Tokens]
+        Auth --> BF[LoginAttemptService<br/>Brute-Force Protection]
+        Auth --> US[UserService<br/>Register / Encrypt]
+        Auth --> RTS[RefreshTokenService]
+        
+        JWT --> Filter[JwtAuthenticationFilter]
+        Filter --> SC[SecurityConfig<br/>Stateless / BCrypt]
+        
+        US --> ENC[EncryptService<br/>AES Encryption]
+    end
 
----
-
-## Dépôt GitHub
-
-👉 [Lien vers le dépôt GitHub du projet](https://github.com/g-holali-david/rgpd-auth-backend.git)
-
----
-
-## Composants RGPD-Compliant implémentés
-
-### 1. Authentification & Tokens
-
-- Génération de **JWT signés** (durée de vie courte)
-- Implémentation de **refresh tokens** stockés en base
-- Endpoint `/auth/refresh` pour générer un nouveau JWT sans se reconnecter
-- **Blacklist** des tokens invalidés (logout)
-- Protection contre le **brute-force** via système de blocage temporaire
-
-### 2. Architecture modulaire (principes SOLID)
-
-- Code organisé par **responsabilités** : `controller`, `model`, `repository`, `security`, `validation`, etc.
-- Annotations personnalisées pour la **validation forte** des champs (`@StrongPassword`)
-- Séparation nette des couches : service, filtre, config, etc.
-
-### 3. Sécurité et RGPD
-
-- **Chiffrement AES** des emails/usernames (confidentialité des données personnelles)
-- **Hashage des mots de passe** avec `BCrypt`
-- Audit de certaines actions critiques (connexion, logout)
-- Planification automatique de nettoyage des tokens expirés via `Spring Scheduler`
-- `@PreAuthorize` et rôles (`USER`, `ADMIN`) pour sécuriser les accès aux routes sensibles
-
----
-
-## ⚙️ SAST / Analyse de sécurité
-
-Un outil de **SAST (Static Application Security Testing)** a été intégré au pipeline CI :
-
-### 🔍 Semgrep (via GitHub Actions)
-```yaml
-- name: Run Semgrep for static security analysis
-  uses: returntocorp/semgrep-action@v1
-  with:
-    config: "p/default"
+    subgraph Data["Data Layer"]
+        ENC -->|Encrypted username/email| DB[(PostgreSQL)]
+        SC -->|BCrypt hashed password| DB
+        RTS -->|Refresh tokens| DB
+        AL[AuditLog] --> DB
+        BL[BlacklistedToken] --> DB
+    end
+    
+    subgraph CI/CD
+        GH[GitHub Actions] -->|Build + Test| MVN[Maven]
+        MVN --> SONAR[SonarCloud]
+        MVN --> SEMGREP[Semgrep SAST]
+        GH -->|Docker Build| DH[Docker Hub]
+    end
 ```
 
-Ce scan détecte les vulnérabilités courantes (injections, mauvaise gestion des tokens, erreurs d’autorisation…).
+## Features
 
----
+- **RGPD-compliant PII storage**: usernames and emails are AES-encrypted at rest
+- **Password security**: BCrypt hashing with custom `@StrongPassword` validator (12+ chars)
+- **JWT authentication**: short-lived access tokens + long-lived refresh tokens stored in DB
+- **Brute-force protection**: account lockout after repeated failed login attempts
+- **Role-based access control**: USER and ADMIN roles with endpoint-level authorization
+- **Token lifecycle**: refresh, revoke (logout), and automatic cleanup via scheduled jobs
+- **Audit logging**: tracks security-relevant events
+- **CI/CD pipeline**: GitHub Actions with Maven build, SonarCloud analysis, Semgrep SAST, and Docker push
+- **Non-root Docker image**: Eclipse Temurin 17 Alpine with dedicated user
 
-## Résumé des Endpoints principaux
+## Tech Stack
 
-| Méthode | URL                         | Description                              |
-|--------|-----------------------------|------------------------------------------|
-| POST   | `/auth/register`            | Inscription avec rôle `USER` par défaut  |
-| POST   | `/auth/login`               | Authentification et retour des tokens    |
-| POST   | `/auth/refresh`             | Génère un nouveau token d’accès          |
-| POST   | `/auth/logout`              | Invalide le refresh token                |
-| GET    | `/users/me`                 | Récupère les infos du profil             |
-| PATCH  | `/users/password`           | Modifier son mot de passe                |
-| DELETE | `/users/me`                 | Supprimer son compte                     |
-| GET    | `/admin/users`              | Voir tous les utilisateurs               |
-| PATCH  | `/admin/users/{id}/enable`  | Activer un compte                        |
-| PATCH  | `/admin/users/{id}/disable` | Désactiver un compte                     |
-| POST   | `/admin/change-role`        | Modifier le rôle d’un utilisateur        |
+| Category | Technology |
+|----------|-----------|
+| Language | Java 17 |
+| Framework | Spring Boot 3.1.5 |
+| Security | Spring Security, JWT (jjwt 0.12.5), BCrypt |
+| Database | PostgreSQL |
+| ORM | Spring Data JPA / Hibernate |
+| Encryption | AES (configurable algorithm) |
+| CI/CD | GitHub Actions |
+| Code Quality | SonarCloud, Semgrep |
+| Container | Docker (Eclipse Temurin 17 Alpine) |
+| Validation | Jakarta Bean Validation |
 
----
+## Getting Started
 
-## Docker & .env
+### Prerequisites
 
-Le projet est conteneurisé (`Dockerfile`) et les variables sensibles sont chargées via un fichier `.env` externe (bonnes pratiques RGPD).
+- Java 17+
+- Maven 3.8+
+- PostgreSQL 14+
+- Docker (optional)
 
----
+### Installation
 
-## CI/CD avec GitHub Actions
+```bash
+git clone https://github.com/g-holali-david/rgpd-auth-backend.git
+cd rgpd-auth-backend
 
-- Compilation
-- Vérifications de sécurité (Semgrep)
-- Tests (à compléter)
-- Intégration continue
+# Configure environment variables (create a .env file)
+# DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
+# JWT_SECRET, JWT_ACCESS_EXPIRATION_MS, JWT_REFRESH_EXPIRATION_MS
+# ENC_ALGORITHM, ENC_SECRET_KEY
 
----
+# Build and run
+./mvnw clean package
+java -jar target/backend-0.0.1-SNAPSHOT.jar
+```
 
+### Usage
 
-## Conclusion
+```bash
+# Register a new user
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"john","email":"john@example.com","password":"MyStr0ngP@ss!!"}'
 
-Ce projet répond aux attentes de la **partie 2.3 du TP RGPD** :
+# Login
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"john","password":"MyStr0ngP@ss!!"}'
 
-- Signature de JWT avec gestion des tokens
-- Backend structuré selon les bonnes pratiques
-- Sécurité RGPD : chiffrement, audit, validation, nettoyage, rôles
-- Analyse SAST intégrée via GitHub Actions
+# Refresh token
+curl -X POST http://localhost:8080/api/v1/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken":"<token>"}'
 
----
+# Docker
+docker build -t rgpd-auth-backend .
+docker run -p 8080:8080 --env-file .env rgpd-auth-backend
+```
 
-> Projet réalisé dans le cadre du TP "RGPD et sécurisation des SI" – Mastère IPSSI, Juin 2025.
+## Project Structure
+
+```
+rgpd-auth-backend/
+├── Dockerfile
+├── pom.xml
+├── sonar-project.properties
+├── .github/workflows/ci.yml       # CI/CD: build, test, SonarCloud, Semgrep, Docker
+└── src/main/java/ms/secureprofile/backend/
+    ├── BackendApplication.java
+    ├── controller/
+    │   ├── AuthController.java     # Register, Login, Refresh, Logout
+    │   ├── UserController.java     # User profile operations
+    │   └── AdminController.java    # Admin-only endpoints
+    ├── model/
+    │   ├── User.java               # Encrypted username/email, hashed password
+    │   ├── Role.java               # USER, ADMIN
+    │   ├── RefreshToken.java
+    │   ├── AuditLog.java
+    │   └── BlacklistedToken.java
+    ├── security/
+    │   ├── SecurityConfig.java     # Stateless JWT, CORS, BCrypt
+    │   ├── JwtService.java         # Token generation & validation
+    │   ├── JwtAuthenticationFilter.java
+    │   ├── EncryptService.java     # AES encryption for PII
+    │   ├── LoginAttemptService.java # Brute-force lockout
+    │   └── UserDetailsServiceImpl.java
+    ├── service/
+    │   ├── UserService.java
+    │   ├── AuditService.java
+    │   └── RefreshTokenService.java
+    ├── repository/                 # JPA repositories
+    ├── validation/
+    │   ├── StrongPassword.java     # Custom annotation
+    │   └── StrongPasswordValidator.java
+    └── exception/
+        └── ValidationExceptionHandler.java
+```
+
+## API Endpoints
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/api/v1/auth/register` | Register new user | Public |
+| POST | `/api/v1/auth/login` | Authenticate & get tokens | Public |
+| POST | `/api/v1/auth/refresh` | Refresh access token | Public |
+| POST | `/api/v1/auth/logout` | Revoke refresh tokens | Public |
+| GET | `/api/v1/admin/**` | Admin operations | ADMIN role |
+
+## Author
+
+**Holali David GAVI** — Cloud & DevOps Engineer
+- Portfolio: [hdgavi.dev](https://hdgavi.dev)
+- GitHub: [@g-holali-david](https://github.com/g-holali-david)
+- LinkedIn: [Holali David GAVI](https://www.linkedin.com/in/holali-david-g-4a434631a/)
+
+## License
+
+MIT
